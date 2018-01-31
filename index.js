@@ -48,7 +48,11 @@ app.get('/createIntermediary', function (req, res) {
         serial: Math.floor(Math.random() * 1000000000),
         days: 1,
     };
-    var customer = req.query.customer;
+    
+    var query = require('url').parse(req.url,true).query;
+    var customer = query.customer;
+    
+    console.log("Generate Intermediary Cert for Customer: " + customer);
 
     var commonName = customer;
 
@@ -92,8 +96,13 @@ app.get('/createIntermediary', function (req, res) {
 });
 
 app.get('/createLeaf', function (req, res) {
-    var customer = req.query.customer;
-    var deviceId = req.query.deviceId;
+
+    var query = require('url').parse(req.url,true).query;
+    var customer = query.customer;
+    var deviceId = query.deviceId;
+
+    console.log("Generate Leaf Cert for Customer: " + customer + " Device: " + deviceId);
+
     if (!fs.existsSync('./keys/leaf/' + deviceId)) {
         fs.mkdirSync('./keys/leaf/' + deviceId);
     }
@@ -136,6 +145,7 @@ app.get('/createLeaf', function (req, res) {
     // Invoke the next step here however you like
 });
 
+<<<<<<< HEAD
 app.get('/verify', function (req, res) {
     var certifPath = req.query.certif;
     var challenge = req.query.challenge;
@@ -182,4 +192,6 @@ app.get('/verify', function (req, res) {
 
 
 
+=======
+>>>>>>> 68752be3528afa367b26a999c71785e6849665af
 http.createServer(app).listen(8000)
