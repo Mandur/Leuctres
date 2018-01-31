@@ -49,7 +49,8 @@ app.get('/createIntermediary', function (req, res) {
         days: 1,
       };
     
-    var customer=req.param.customer;
+      var query = require('url').parse(req.url,true).query;
+      var customer = query.customer;
     if (!fs.existsSync('./keys/middle/'+customer)){
         fs.mkdirSync('./keys/middle/'+customer);
     }
