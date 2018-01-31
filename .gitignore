@@ -65,3 +65,5 @@ keys/intermediary
 keys/leaf
 
 keys/root
+
+keys/verify
