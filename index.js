@@ -24,7 +24,11 @@ app.get('/createRoot', function (req, res) {
 
 
 app.get('/createMiddle', function (req, res) {
-    var customer=req.param.customer;
+    //var customer=req.param.customer;
+    var query = require('url').parse(req.url,true).query;
+    var customer = query.customer;
+    console.log("Generate Middle Cert for Customer: " + customer);
+    
     if (!fs.existsSync('./keys/middle/'+customer)){
         fs.mkdirSync('./keys/middle/'+customer);
     }
