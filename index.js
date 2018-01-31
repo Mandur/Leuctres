@@ -1,3 +1,4 @@
+
 var http = require('http')
 var pem = require('pem')
 var express = require('express')
@@ -6,16 +7,34 @@ pem.config({
     pathOpenSSL: '/usr/bin/openssl'
 })
 
-var app = express()
+var app = express();
+var commonName ="myCommonName";
 
 app.get('/createRoot', function (req, res) {
 
+    var certOptions = {
+        commonName: commonName,
+        serial: Math.floor(Math.random() * 1000000000),
+        days: 1,
+      };
+    
+      certOptions.config = [
+        '[req]',
+        'req_extensions = v3_req',
+        'distinguished_name = req_distinguished_name',
+        'x509_extensions = v3_ca',
+        '[req_distinguished_name]',
+        'commonName = ' + commonName,
+        '[v3_req]',
+        'basicConstraints = critical, CA:true'
+      ].join('\n');
+      certOptions.selfSigned = true;
+
     var csr = pem.createCertificate(
-        { days: 180, organization: "smarthometechnology", country: "CH", state: "ZH", selfSigned: true }, function (err, arg) {
-            fs.writeFile("./keys/root/certificate.pem", arg.certificate);
-            fs.writeFile("./keys/root/clientKey.key", arg.clientKey);
-            fs.writeFile("./keys/root/csr.csr", arg.csr);
-            fs.writeFile("./keys/root/serviceKey.key", arg.serviceKey);
+        certOptions , function (err, cert) {
+            fs.writeFile("./keys/root/_cert.pem", cert.certificate);
+            fs.writeFile("./keys/root/_key.pem", cert.clientKey);
+            fs.writeFile("./keys/root/_fullchain.pem", cert.certificate);
 
         });
     console.log(csr);
@@ -23,34 +42,48 @@ app.get('/createRoot', function (req, res) {
 });
 
 
-app.get('/createMiddle', function (req, res) {
+app.get('/createIntermediary', function (req, res) {
+    var certOptions = {
+        commonName: commonName,
+        serial: Math.floor(Math.random() * 1000000000),
+        days: 1,
+      };
+    
     var customer=req.param.customer;
     if (!fs.existsSync('./keys/middle/'+customer)){
         fs.mkdirSync('./keys/middle/'+customer);
     }
+    parentCert = fs.readFileSync('./keys/root/' + '_cert.pem').toString('ascii');
+    parentKey = fs.readFileSync('./keys/root/' + '_key.pem').toString('ascii');
+    parentChain = fs.readFileSync('./keys/root/' + '_fullchain.pem').toString('ascii');
 
-    fs.readFile('./keys/root/clientKey.key', "utf-8",function read(err, dataServiceKey) {
-        if (err) {
-            throw err;
-        }
-        console.log(dataServiceKey);
-        fs.readFile('./keys/root/csr.csr', "utf-8",function read(err2, datacsr) {
-            if (err2) {
-                throw err2;
-            }
-        console.log(datacsr);
+    certOptions.config = [
+        '[req]',
+        'req_extensions = v3_req',
+        'distinguished_name = req_distinguished_name',
+        'x509_extensions = v3_ca',
+        '[req_distinguished_name]',
+        'commonName = ' + commonName,
+        '[v3_req]',
+        'basicConstraints = critical, CA:true'
+      ].join('\n');
+
+        certOptions.serviceKey = parentKey;
+        certOptions.serviceCertificate = parentCert;
+  
         var csr = pem.createCertificate(
-            { serviceKey: dataServiceKey, selfSigned:false,csr:datacsr,days:180,country:"ch",organization:"ms",commonName:"test" }, function (err, arg) {
-                fs.writeFile("./keys/middle/"+customer+"/certificate.pem", arg.certificate);
-                fs.writeFile("./keys/middle/"+customer+"/clientKey.key", arg.clientKey);
-                fs.writeFile("./keys/middle/"+customer+"/csr.csr", arg.csr);
-                fs.writeFile("./keys/middle/"+customer+"/serviceKey.key", arg.serviceKey);
+            certOptions , function (err, cert) {
+                console.log(err);
+                console.log(cert);
+                fs.writeFile('./keys/middle/'+customer+'/_cert.pem', cert.certificate);
+                fs.writeFile('./keys/middle/'+customer+'/_key.pem', cert.clientKey);
+                fs.writeFile('./keys/middle/'+customer+'/_fullchain.pem', cert.certificate+'\n'+parentChain);
 
             });
-        });
+
 
         // Invoke the next step here however you like
-    });
+
 
     res.send('generated middle certificate')
 });
@@ -61,26 +94,43 @@ app.get('/createLeaf', function (req, res) {
     if (!fs.existsSync('./keys/leaf/'+deviceId)){
         fs.mkdirSync('./keys/leaf/'+deviceId);
     }
-    // First I want to read the file
-    fs.readFile('./keys/middle/'+customer+'/serviceKey.key', function read(err, data) {
-        if (err) {
-            throw err;
-        }
-        console.log(data);
-        var csr = pem.createCertificate(
-            { serviceKey: data, selfSigned:false }, function (err, arg) {
-                fs.writeFile("./keys/leaf/"+deviceId+"/certificate.pem", arg.certificate);
-                fs.writeFile("./keys/leaf/"+deviceId+"/clientKey.key", arg.clientKey);
-                fs.writeFile("./keys/leaf/"+deviceId+"/csr.csr", arg.csr);
-                fs.writeFile("./keys/leaf/"+deviceId+"/serviceKey.key", arg.serviceKey);
 
-            });
+        parentCert = fs.readFileSync('./keys/middle/'+customer+'/_cert.pem').toString('ascii');
+        parentKey = fs.readFileSync('./keys/middle/'+customer+'/_key.pem').toString('ascii');
+        parentChain = fs.readFileSync('./keys/middle/'+customer+'/_fullchain.pem').toString('ascii');
+    var certOptions = {
+        commonName: commonName,
+        serial: Math.floor(Math.random() * 1000000000),
+        days: 1,
+      };
+
+      certOptions.config = [
+        '[req]',
+        'req_extensions = v3_req',
+        'distinguished_name = req_distinguished_name',
+        '[req_distinguished_name]',
+        'commonName = ' + commonName,
+        '[v3_req]',
+        'extendedKeyUsage = critical,clientAuth'
+      ].join('\n');
+
+      certOptions.serviceKey = parentKey;
+      certOptions.serviceCertificate = parentCert;
+
+      var csr = pem.createCertificate(
+        certOptions , function (err, cert) {
+            console.log(err);
+            console.log(cert);
+            fs.writeFile('./keys/leaf/'+deviceId+'/_cert.pem', cert.certificate);
+            fs.writeFile('./keys/leaf/'+deviceId+'/_key.pem', cert.clientKey);
+            fs.writeFile('./keys/leaf/'+deviceId+'/_fullchain.pem', cert.certificate+'\n'+parentChain);
+
+        });
+        res.send('generated leaf certificate')
 
         // Invoke the next step here however you like
     });
 
-    res.send('generated middle certificate')
-});
 
 
 http.createServer(app).listen(8000)
