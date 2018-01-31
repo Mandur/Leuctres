@@ -8,17 +8,17 @@ pem.config({
 })
 
 var app = express();
-var commonName ="myCommonName";
 
 app.get('/createRoot', function (req, res) {
+    var commonName = "testRoot";
 
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
         days: 1,
-      };
-    
-      certOptions.config = [
+    };
+
+    certOptions.config = [
         '[req]',
         'req_extensions = v3_req',
         'distinguished_name = req_distinguished_name',
@@ -27,11 +27,11 @@ app.get('/createRoot', function (req, res) {
         'commonName = ' + commonName,
         '[v3_req]',
         'basicConstraints = critical, CA:true'
-      ].join('\n');
-      certOptions.selfSigned = true;
+    ].join('\n');
+    certOptions.selfSigned = true;
 
     var csr = pem.createCertificate(
-        certOptions , function (err, cert) {
+        certOptions, function (err, cert) {
             fs.writeFile("./keys/root/_cert.pem", cert.certificate);
             fs.writeFile("./keys/root/_key.pem", cert.clientKey);
             fs.writeFile("./keys/root/_fullchain.pem", cert.certificate);
@@ -47,12 +47,14 @@ app.get('/createIntermediary', function (req, res) {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
         days: 1,
-      };
-    
-      var query = require('url').parse(req.url,true).query;
-      var customer = query.customer;    
-    if (!fs.existsSync('./keys/intermediary/'+customer)){
-        fs.mkdirSync('./keys/intermediary/'+customer);
+    };
+    var customer = req.query.customer;
+
+    var commonName = customer;
+
+
+    if (!fs.existsSync('./keys/intermediary/' + customer)) {
+        fs.mkdirSync('./keys/intermediary/' + customer);
     }
     parentCert = fs.readFileSync('./keys/root/' + '_cert.pem').toString('ascii');
     parentKey = fs.readFileSync('./keys/root/' + '_key.pem').toString('ascii');
@@ -67,45 +69,47 @@ app.get('/createIntermediary', function (req, res) {
         'commonName = ' + commonName,
         '[v3_req]',
         'basicConstraints = critical, CA:true'
-      ].join('\n');
+    ].join('\n');
 
-        certOptions.serviceKey = parentKey;
-        certOptions.serviceCertificate = parentCert;
-  
-        var csr = pem.createCertificate(
-            certOptions , function (err, cert) {
-                console.log(err);
-                console.log(cert);
-                fs.writeFile('./keys/intermediary/'+customer+'/_cert.pem', cert.certificate);
-                fs.writeFile('./keys/intermediary/'+customer+'/_key.pem', cert.clientKey);
-                fs.writeFile('./keys/intermediary/'+customer+'/_fullchain.pem', cert.certificate+'\n'+parentChain);
+    certOptions.serviceKey = parentKey;
+    certOptions.serviceCertificate = parentCert;
 
-            });
+    var csr = pem.createCertificate(
+        certOptions, function (err, cert) {
+            console.log(err);
+            console.log(cert);
+            fs.writeFile('./keys/intermediary/' + customer + '/_cert.pem', cert.certificate);
+            fs.writeFile('./keys/intermediary/' + customer + '/_key.pem', cert.clientKey);
+            fs.writeFile('./keys/intermediary/' + customer + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
+
+        });
 
 
-        // Invoke the next step here however you like
+    // Invoke the next step here however you like
 
 
     res.send('generated intermediary certificate')
 });
 
 app.get('/createLeaf', function (req, res) {
-    var customer=req.param.customer;
-    var deviceId=req.param.deviceId;
-    if (!fs.existsSync('./keys/leaf/'+deviceId)){
-        fs.mkdirSync('./keys/leaf/'+deviceId);
+    var customer = req.query.customer;
+    var deviceId = req.query.deviceId;
+    if (!fs.existsSync('./keys/leaf/' + deviceId)) {
+        fs.mkdirSync('./keys/leaf/' + deviceId);
     }
 
-        parentCert = fs.readFileSync('./keys/intermediary/'+customer+'/_cert.pem').toString('ascii');
-        parentKey = fs.readFileSync('./keys/intermediary/'+customer+'/_key.pem').toString('ascii');
-        parentChain = fs.readFileSync('./keys/intermediary/'+customer+'/_fullchain.pem').toString('ascii');
+    var commonName = deviceId;
+
+    parentCert = fs.readFileSync('./keys/intermediary/' + customer + '/_cert.pem').toString('ascii');
+    parentKey = fs.readFileSync('./keys/intermediary/' + customer + '/_key.pem').toString('ascii');
+    parentChain = fs.readFileSync('./keys/intermediary/' + customer + '/_fullchain.pem').toString('ascii');
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
         days: 1,
-      };
+    };
 
-      certOptions.config = [
+    certOptions.config = [
         '[req]',
         'req_extensions = v3_req',
         'distinguished_name = req_distinguished_name',
@@ -113,24 +117,24 @@ app.get('/createLeaf', function (req, res) {
         'commonName = ' + commonName,
         '[v3_req]',
         'extendedKeyUsage = critical,clientAuth'
-      ].join('\n');
+    ].join('\n');
 
-      certOptions.serviceKey = parentKey;
-      certOptions.serviceCertificate = parentCert;
+    certOptions.serviceKey = parentKey;
+    certOptions.serviceCertificate = parentCert;
 
-      var csr = pem.createCertificate(
-        certOptions , function (err, cert) {
+    var csr = pem.createCertificate(
+        certOptions, function (err, cert) {
             console.log(err);
             console.log(cert);
-            fs.writeFile('./keys/leaf/'+deviceId+'/_cert.pem', cert.certificate);
-            fs.writeFile('./keys/leaf/'+deviceId+'/_key.pem', cert.clientKey);
-            fs.writeFile('./keys/leaf/'+deviceId+'/_fullchain.pem', cert.certificate+'\n'+parentChain);
+            fs.writeFile('./keys/leaf/' + deviceId + '/_cert.pem', cert.certificate);
+            fs.writeFile('./keys/leaf/' + deviceId + '/_key.pem', cert.clientKey);
+            fs.writeFile('./keys/leaf/' + deviceId + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
 
         });
-        res.send('generated leaf certificate')
+    res.send('generated leaf certificate')
 
-        // Invoke the next step here however you like
-    });
+    // Invoke the next step here however you like
+});
 
 
 
