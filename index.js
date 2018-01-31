@@ -50,9 +50,9 @@ app.get('/createIntermediary', function (req, res) {
       };
     
       var query = require('url').parse(req.url,true).query;
-      var customer = query.customer;
-    if (!fs.existsSync('./keys/middle/'+customer)){
-        fs.mkdirSync('./keys/middle/'+customer);
+      var customer = query.customer;    
+    if (!fs.existsSync('./keys/intermediary/'+customer)){
+        fs.mkdirSync('./keys/intermediary/'+customer);
     }
     parentCert = fs.readFileSync('./keys/root/' + '_cert.pem').toString('ascii');
     parentKey = fs.readFileSync('./keys/root/' + '_key.pem').toString('ascii');
@@ -76,9 +76,9 @@ app.get('/createIntermediary', function (req, res) {
             certOptions , function (err, cert) {
                 console.log(err);
                 console.log(cert);
-                fs.writeFile('./keys/middle/'+customer+'/_cert.pem', cert.certificate);
-                fs.writeFile('./keys/middle/'+customer+'/_key.pem', cert.clientKey);
-                fs.writeFile('./keys/middle/'+customer+'/_fullchain.pem', cert.certificate+'\n'+parentChain);
+                fs.writeFile('./keys/intermediary/'+customer+'/_cert.pem', cert.certificate);
+                fs.writeFile('./keys/intermediary/'+customer+'/_key.pem', cert.clientKey);
+                fs.writeFile('./keys/intermediary/'+customer+'/_fullchain.pem', cert.certificate+'\n'+parentChain);
 
             });
 
@@ -86,7 +86,7 @@ app.get('/createIntermediary', function (req, res) {
         // Invoke the next step here however you like
 
 
-    res.send('generated middle certificate')
+    res.send('generated intermediary certificate')
 });
 
 app.get('/createLeaf', function (req, res) {
@@ -96,9 +96,9 @@ app.get('/createLeaf', function (req, res) {
         fs.mkdirSync('./keys/leaf/'+deviceId);
     }
 
-        parentCert = fs.readFileSync('./keys/middle/'+customer+'/_cert.pem').toString('ascii');
-        parentKey = fs.readFileSync('./keys/middle/'+customer+'/_key.pem').toString('ascii');
-        parentChain = fs.readFileSync('./keys/middle/'+customer+'/_fullchain.pem').toString('ascii');
+        parentCert = fs.readFileSync('./keys/intermediary/'+customer+'/_cert.pem').toString('ascii');
+        parentKey = fs.readFileSync('./keys/intermediary/'+customer+'/_key.pem').toString('ascii');
+        parentChain = fs.readFileSync('./keys/intermediary/'+customer+'/_fullchain.pem').toString('ascii');
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
