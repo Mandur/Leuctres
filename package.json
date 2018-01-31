@@ -9,6 +9,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "azure-iot-provisioning-device": "1.0.0",
+    "azure-iot-provisioning-device-amqp": "1.0.0",
+    "azure-iot-provisioning-device-http": "^1.0.0",
+    "azure-iot-provisioning-device-mqtt": "1.0.0",
+    "azure-iot-provisioning-service": "^1.0.1",
+    "azure-iot-security-x509": "1.0.0",
+    "dotenv": "^5.0.0",
     "express": "^4.16.2",
     "pem": "^1.12.3"
   }

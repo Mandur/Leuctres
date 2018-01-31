@@ -3,6 +3,8 @@ var http = require('http')
 var pem = require('pem')
 var express = require('express')
 var fs = require('fs');
+require('dotenv').config();
+
 pem.config({
     pathOpenSSL: '/usr/bin/openssl'
 })
@@ -48,10 +50,10 @@ app.get('/createIntermediary', function (req, res) {
         serial: Math.floor(Math.random() * 1000000000),
         days: 1,
     };
-    
-    var query = require('url').parse(req.url,true).query;
+
+    var query = require('url').parse(req.url, true).query;
     var customer = query.customer;
-    
+
     console.log("Generate Intermediary Cert for Customer: " + customer);
 
     var commonName = customer;
@@ -97,7 +99,7 @@ app.get('/createIntermediary', function (req, res) {
 
 app.get('/createLeaf', function (req, res) {
 
-    var query = require('url').parse(req.url,true).query;
+    var query = require('url').parse(req.url, true).query;
     var customer = query.customer;
     var deviceId = query.deviceId;
 
@@ -145,7 +147,6 @@ app.get('/createLeaf', function (req, res) {
     // Invoke the next step here however you like
 });
 
-<<<<<<< HEAD
 app.get('/verify', function (req, res) {
     var certifPath = req.query.certif;
     var challenge = req.query.challenge;
@@ -185,13 +186,89 @@ app.get('/verify', function (req, res) {
             fs.writeFile('./keys/verif/' + commonName + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
 
         });
-    res.send('generated leaf certificate')
+    res.send('generated verifcation certificate')
 
     // Invoke the next step here however you like
 });
 
+app.get('/createGroup', function (req, res) {
+
+    var certiftype = req.query.certiftype;
+    var groupname = req.query.groupname;
+    var customername = req.query.customername;
+
+    var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
+
+    var serviceClient = provisioningServiceClient.fromConnectionString(process.env.CONNECTION_STRING);
+
+    var enrollment = {
+        enrollmentGroupId: groupname,
+        attestation: {
+            type: 'x509',
+            x509: {
+                signingCertificates: {
+                    primary: {
+                        certificate: fs.readFileSync('./keys/'+certiftype+'/'+customername+'/' + '_cert.pem', 'utf-8').toString()
+                    }
+                }
+            }
+        },
+        provisioningStatus: 'disabled'
+    };
+
+    serviceClient.createOrUpdateEnrollmentGroup(enrollment, function (err, enrollmentResponse) {
+        if (err) {
+            console.log('error creating the group enrollment: ' + err);
+        } else {
+            console.log("enrollment record returned: " + JSON.stringify(enrollmentResponse, null, 2));
+            enrollmentResponse.provisioningStatus = 'enabled';
+            serviceClient.createOrUpdateEnrollmentGroup(enrollmentResponse, function (err, enrollmentResponse) {
+                if (err) {
+                    console.log('error updating the group enrollment: ' + err);
+                } else {
+                    console.log("updated enrollment record returned: " + JSON.stringify(enrollmentResponse, null, 2));
+                }
+            });
+        }
+    });
+    res.send('generated group enrolment');
+});
+app.get('/joinGroup', function (req, res) {
+    var Transport = require('azure-iot-provisioning-device-http').Http;
+
+    // Feel free to change the preceding using statement to anyone of the following if you would like to try another protocol.
+    //var Transport = require('azure-iot-provisioning-device-amqp').Amqp;
+    // var Transport = require('azure-iot-provisioning-device-amqp').AmqpWs;
+    // var Transport = require('azure-iot-provisioning-device-mqtt').Mqtt;
+    // var Transport = require('azure-iot-provisioning-device-mqtt').MqttWs;
+
+    var X509Security = require('azure-iot-security-x509').X509Security;
+    var ProvisioningDeviceClient = require('azure-iot-provisioning-device').ProvisioningDeviceClient;
+
+    var provisioningHost = 'global.azure-devices-provisioning.net';
+    var idScope = process.env.ID_SCOPE;
+    var registrationId = req.query.deviceId;
+    var deviceCert = {
+        cert: fs.readFileSync('./keys/leaf/'+registrationId+'/_fullchain.pem').toString(),
+        key: fs.readFileSync('./keys/leaf/'+registrationId  +'/_key.pem').toString()
+    };
+
+    var transport = new Transport();
+    var securityClient = new X509Security(registrationId, deviceCert);
+    var deviceClient = ProvisioningDeviceClient.create(provisioningHost, idScope, transport, securityClient);
+
+    // Register the device.  Do not force a re-registration.
+    deviceClient.register(function (err, result) {
+        if (err) {
+            console.log("error registering device: " + err);
+        } else {
+            console.log('registration succeeded');
+            console.log('assigned hub=' + result.assignedHub);
+            console.log('deviceId=' + result.deviceId);
+        }
+    });
+});
 
 
-=======
->>>>>>> 68752be3528afa367b26a999c71785e6849665af
+
 http.createServer(app).listen(8000)
