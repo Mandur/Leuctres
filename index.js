@@ -136,6 +136,50 @@ app.get('/createLeaf', function (req, res) {
     // Invoke the next step here however you like
 });
 
+app.get('/verify', function (req, res) {
+    var certifPath = req.query.certif;
+    var challenge = req.query.challenge;
+    if (!fs.existsSync('./keys/verif/' + challenge)) {
+        fs.mkdirSync('./keys/verif/' + challenge);
+    }
+
+    var commonName = challenge;
+    parentCert = fs.readFileSync('./keys/root/' + '_cert.pem').toString('ascii');
+    parentKey = fs.readFileSync('./keys/root/' + '_key.pem').toString('ascii');
+    parentChain = fs.readFileSync('./keys/root/' + '_fullchain.pem').toString('ascii');
+    var certOptions = {
+        commonName: commonName,
+        serial: Math.floor(Math.random() * 1000000000),
+        days: 1,
+    };
+
+    certOptions.config = [
+        '[req]',
+        'req_extensions = v3_req',
+        'distinguished_name = req_distinguished_name',
+        '[req_distinguished_name]',
+        'commonName = ' + commonName,
+        '[v3_req]',
+        'extendedKeyUsage = critical,clientAuth'
+    ].join('\n');
+
+    certOptions.serviceKey = parentKey;
+    certOptions.serviceCertificate = parentCert;
+
+    var csr = pem.createCertificate(
+        certOptions, function (err, cert) {
+            console.log(err);
+            console.log(cert);
+            fs.writeFile('./keys/verif/' + commonName + '/_cert.pem', cert.certificate);
+            fs.writeFile('./keys/verif/' + commonName + '/_key.pem', cert.clientKey);
+            fs.writeFile('./keys/verif/' + commonName + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
+
+        });
+    res.send('generated leaf certificate')
+
+    // Invoke the next step here however you like
+});
+
 
 
 http.createServer(app).listen(8000)
