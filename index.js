@@ -148,10 +148,14 @@ app.get('/createLeaf', function (req, res) {
 });
 
 app.get('/verify', function (req, res) {
-    var certifPath = req.query.certif;
-    var challenge = req.query.challenge;
-    if (!fs.existsSync('./keys/verif/' + challenge)) {
-        fs.mkdirSync('./keys/verif/' + challenge);
+
+    var query = require('url').parse(req.url,true).query;
+
+    var customer = query.customer;
+    var challenge = query.challenge;
+
+    if (!fs.existsSync('./keys/verif/' + customer)) {
+        fs.mkdirSync('./keys/verif/' + customer);
     }
 
     var commonName = challenge;
@@ -270,5 +274,8 @@ app.get('/joinGroup', function (req, res) {
 });
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 48e6a6ff52090b7a1ad771be7c11ca3858c665fe
 http.createServer(app).listen(8000)
