@@ -1,0 +1,14 @@
+Create root cert:
+http://localhost:8000/createRoot?customer=smarthometechnology
+
+Verify root cert:
+http://localhost:8000/verify?customer=smarthometechnology&challenge=0253759BF9D68005319AC2BFE4E48A3DC7FE0D33A525D9AC
+
+Create intermediary cert:
+http://localhost:8000/createIntermediary?customer=smarthometechnology
+
+Create leaf cert:
+http://localhost:8000/createleaf?customer=smarthometechnology&deviceId=beerstation001
+
+Register device in IoT hub using DPS group registration:
+http://localhost:8000/joinGroup?idscope=0ne0000B2D4&customer=smarthometechnology&deviceId=beerstation001
