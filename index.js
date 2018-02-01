@@ -1,4 +1,5 @@
 
+
 var http = require('http')
 var pem = require('pem')
 var express = require('express')
@@ -43,7 +44,7 @@ app.get('/createRoot', function (req, res) {
     res.send('generated root certificate')
 });
 
-
+//customer
 app.get('/createIntermediary', function (req, res) {
     var certOptions = {
         commonName: commonName,
@@ -97,11 +98,13 @@ app.get('/createIntermediary', function (req, res) {
     res.send('generated intermediary certificate')
 });
 
-app.get('/createLeaf', function (req, res) {
+
+//customer, deviceid
+app.get('/createleaf', function (req, res) {
 
     var query = require('url').parse(req.url, true).query;
     var customer = query.customer;
-    var deviceId = query.deviceId;
+    var deviceId = query.deviceid;
 
     console.log("Generate Leaf Cert for Customer: " + customer + " Device: " + deviceId);
 
@@ -273,9 +276,26 @@ app.get('/joinGroup', function (req, res) {
     });
 });
 
+app.get('/clean',function(req,res){
+    var path = "./keys";
+   deleteFolderRecursive(path);
+    fs.mkdirSync(path);
+});
 
-<<<<<<< HEAD
+function deleteFolderRecursive(path){
+    if (fs.existsSync(path)) {
+        fs.readdirSync(path).forEach(function(file, index){
+          var curPath = path + "/" + file;
+          if (fs.lstatSync(curPath).isDirectory()) { // recurse
+            deleteFolderRecursive(curPath);
+          } else { // delete file
+            fs.unlinkSync(curPath);
+          }
+        });
+        fs.rmdirSync(path);
+      }
+      res.send('cleaned');
+}
 
-=======
->>>>>>> 48e6a6ff52090b7a1ad771be7c11ca3858c665fe
+
 http.createServer(app).listen(8000)
