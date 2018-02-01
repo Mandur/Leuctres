@@ -14,8 +14,7 @@ var app = express();
 
 //rootname
 app.get('/createRoot', function (req, res) {
-    var commonName = "testRoot";
-
+    var commonName = req.query.rootname;
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
@@ -241,6 +240,9 @@ app.get('/createGroup', function (req, res) {
     });
     res.send('generated group enrolment');
 });
+
+
+//deviceid
 app.get('/joinGroup', function (req, res) {
     var Transport = require('azure-iot-provisioning-device-http').Http;
 
@@ -255,7 +257,7 @@ app.get('/joinGroup', function (req, res) {
 
     var provisioningHost = 'global.azure-devices-provisioning.net';
     var idScope = process.env.ID_SCOPE;
-    var registrationId = req.query.deviceId;
+    var registrationId = req.query.deviceid;
     var deviceCert = {
         cert: fs.readFileSync('./keys/leaf/'+registrationId+'/_fullchain.pem').toString(),
         key: fs.readFileSync('./keys/leaf/'+registrationId  +'/_key.pem').toString()
@@ -281,6 +283,7 @@ app.get('/clean',function(req,res){
     var path = "./keys";
    deleteFolderRecursive(path);
     fs.mkdirSync(path);
+    res.send('cleaned');
 });
 
 function deleteFolderRecursive(path){
@@ -295,7 +298,7 @@ function deleteFolderRecursive(path){
         });
         fs.rmdirSync(path);
       }
-      res.send('cleaned');
+
 }
 
 
