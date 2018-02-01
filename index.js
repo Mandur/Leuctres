@@ -28,7 +28,7 @@ app.get('/createRoot', function (req, res) {
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
-        days: 365,
+        days: 36500,
     };
 
     certOptions.config = [
@@ -60,7 +60,7 @@ app.get('/createIntermediary', function (req, res) {
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
-        days: 365,
+        days: 36500,
     };
 
     var query = require('url').parse(req.url, true).query;
@@ -141,7 +141,7 @@ app.get('/createLeaf', function (req, res) {
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
-        days: 365,
+        days: 36500,
     };
 
     certOptions.config = [
@@ -193,7 +193,7 @@ app.get('/verify', function (req, res) {
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
-        days: 365,
+        days: 36500,
     };
 
     certOptions.config = [
@@ -267,6 +267,49 @@ app.get('/createGroup', function (req, res) {
     });
     res.send('generated group enrolment');
 });
+
+
+
+app.get('/createDevice', function (req, res) {
+
+    var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
+ 
+    var query = require('url').parse(req.url,true).query;
+
+    var customer = query.customer;
+    var registrationId = query.deviceId;
+    // var connectionString = query.connectionString;
+    var connectionString = 'HostName=SaschacIoTTestProvisioning.azure-devices-provisioning.net;SharedAccessKeyName=provisioningserviceowner;SharedAccessKey=SDOxMMGc/KHKEIuiilr3A0o5YFexJto6JMd1OZE5zbs='
+    
+    var serviceClient = provisioningServiceClient.fromConnectionString(connectionString);
+    
+    var deviceCert = fs.readFileSync('./keys/leaf/' + customer + '/' + registrationId + '/_cert.pem').toString();
+    
+    var enrollment = {
+      registrationId: registrationId,
+      deviceID: registrationId,
+      attestation: {
+        type: 'x509',
+        x509: {
+          clientCertificates: {
+            primary: {
+              certificate: deviceCert
+            }
+          }
+        }
+      }
+    };
+    
+    serviceClient.createOrUpdateIndividualEnrollment(enrollment, function (err, enrollmentResponse) {
+      if (err) {
+        console.log('error creating the individual enrollment: ' + err);
+      } else {
+        console.log("enrollment record returned: " + JSON.stringify(enrollmentResponse, null, 2));
+      }
+    });
+    res.send('generated device enrolment for: ' + registrationId);
+});
+
 
 app.get('/joinGroup', function (req, res) {
     var Transport = require('azure-iot-provisioning-device-http').Http;
