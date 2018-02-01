@@ -1,3 +1,5 @@
+
+
 var http = require('http')
 var pem = require('pem')
 var express = require('express')
@@ -10,25 +12,17 @@ pem.config({
 
 var app = express();
 
+//rootname
 app.get('/createRoot', function (req, res) {
-    
-    var query = require('url').parse(req.url, true).query;
-    var customer = query.customer;
-    
-    var commonName = customer;
-
-    if (!fs.existsSync('./keys/root')) {
-        fs.mkdirSync('./keys/root/');
-    }
-
-    if (!fs.existsSync('./keys/root/' + customer)) {
-        fs.mkdirSync('./keys/root/' + customer);
-    }
-
+    var commonName = req.query.rootname;
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
+<<<<<<< HEAD
         days: 36500,
+=======
+        days: 1,
+>>>>>>> e999f970a53d3b3443cdea794b6c3c53f7947875
     };
 
     certOptions.config = [
@@ -41,26 +35,29 @@ app.get('/createRoot', function (req, res) {
         '[v3_req]',
         'basicConstraints = critical, CA:true'
     ].join('\n');
-
     certOptions.selfSigned = true;
 
     var csr = pem.createCertificate(
         certOptions, function (err, cert) {
-            fs.writeFile("./keys/root/" + customer + "/_cert.pem", cert.certificate);
-            fs.writeFile("./keys/root/" + customer + "/_key.pem", cert.clientKey);
-            fs.writeFile("./keys/root/" + customer + "/_fullchain.pem", cert.certificate);
+            fs.writeFile("./keys/root/_cert.pem", cert.certificate);
+            fs.writeFile("./keys/root/_key.pem", cert.clientKey);
+            fs.writeFile("./keys/root/_fullchain.pem", cert.certificate);
 
         });
     console.log(csr);
     res.send('generated root certificate')
 });
 
-
+//customer
 app.get('/createIntermediary', function (req, res) {
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
+<<<<<<< HEAD
         days: 36500,
+=======
+        days: 1,
+>>>>>>> e999f970a53d3b3443cdea794b6c3c53f7947875
     };
 
     var query = require('url').parse(req.url, true).query;
@@ -70,17 +67,13 @@ app.get('/createIntermediary', function (req, res) {
 
     var commonName = customer;
 
-    if (!fs.existsSync('./keys/intermediary')) {
-        fs.mkdirSync('./keys/intermediary');
-    }
 
-        if (!fs.existsSync('./keys/intermediary/' + customer)) {
+    if (!fs.existsSync('./keys/intermediary/' + customer)) {
         fs.mkdirSync('./keys/intermediary/' + customer);
     }
-
-    parentCert = fs.readFileSync('./keys/root/' + customer + '/_cert.pem').toString('ascii');
-    parentKey = fs.readFileSync('./keys/root/' + customer + '/_key.pem').toString('ascii');
-    parentChain = fs.readFileSync('./keys/root/' + customer + '/_fullchain.pem').toString('ascii');
+    parentCert = fs.readFileSync('./keys/root/' + '_cert.pem').toString('ascii');
+    parentKey = fs.readFileSync('./keys/root/' + '_key.pem').toString('ascii');
+    parentChain = fs.readFileSync('./keys/root/' + '_fullchain.pem').toString('ascii');
 
     certOptions.config = [
         '[req]',
@@ -113,24 +106,18 @@ app.get('/createIntermediary', function (req, res) {
     res.send('generated intermediary certificate')
 });
 
-app.get('/createLeaf', function (req, res) {
+
+//customer, deviceid
+app.get('/createleaf', function (req, res) {
 
     var query = require('url').parse(req.url, true).query;
     var customer = query.customer;
-    var deviceId = query.deviceId;
+    var deviceId = query.deviceid;
 
     console.log("Generate Leaf Cert for Customer: " + customer + " Device: " + deviceId);
 
-    if (!fs.existsSync('./keys/leaf')) {
-        fs.mkdirSync('./keys/leaf');
-    }
-
-    if (!fs.existsSync('./keys/leaf/' + customer)) {
-        fs.mkdirSync('./keys/leaf/' + customer);
-    }
-
-    if (!fs.existsSync('./keys/leaf/' + customer + '/' + deviceId)) {
-        fs.mkdirSync('./keys/leaf/' + customer + '/' + deviceId);
+    if (!fs.existsSync('./keys/leaf/' + deviceId)) {
+        fs.mkdirSync('./keys/leaf/' + deviceId);
     }
 
     var commonName = deviceId;
@@ -141,7 +128,11 @@ app.get('/createLeaf', function (req, res) {
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
+<<<<<<< HEAD
         days: 36500,
+=======
+        days: 1,
+>>>>>>> e999f970a53d3b3443cdea794b6c3c53f7947875
     };
 
     certOptions.config = [
@@ -161,9 +152,9 @@ app.get('/createLeaf', function (req, res) {
         certOptions, function (err, cert) {
             console.log(err);
             console.log(cert);
-            fs.writeFile('./keys/leaf/' + customer +'/' + deviceId + '/_cert.pem', cert.certificate);
-            fs.writeFile('./keys/leaf/' + customer +'/' + deviceId + '/_key.pem', cert.clientKey);
-            fs.writeFile('./keys/leaf/' + customer +'/' + deviceId + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
+            fs.writeFile('./keys/leaf/' + deviceId + '/_cert.pem', cert.certificate);
+            fs.writeFile('./keys/leaf/' + deviceId + '/_key.pem', cert.clientKey);
+            fs.writeFile('./keys/leaf/' + deviceId + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
 
         });
     res.send('generated leaf certificate')
@@ -178,22 +169,22 @@ app.get('/verify', function (req, res) {
     var customer = query.customer;
     var challenge = query.challenge;
 
-    if (!fs.existsSync('./keys/verify/')) {
-        fs.mkdirSync('./keys/verify/');
-    }
-
-    if (!fs.existsSync('./keys/verify/' + customer)) {
-        fs.mkdirSync('./keys/verify/' + customer);
+    if (!fs.existsSync('./keys/verif/' + customer)) {
+        fs.mkdirSync('./keys/verif/' + customer);
     }
 
     var commonName = challenge;
-    parentCert = fs.readFileSync('./keys/root/' + customer + '/_cert.pem').toString('ascii');
-    parentKey = fs.readFileSync('./keys/root/' + customer + '/_key.pem').toString('ascii');
-    parentChain = fs.readFileSync('./keys/root/' + customer + '/_fullchain.pem').toString('ascii');
+    parentCert = fs.readFileSync('./keys/root/' + '_cert.pem').toString('ascii');
+    parentKey = fs.readFileSync('./keys/root/' + '_key.pem').toString('ascii');
+    parentChain = fs.readFileSync('./keys/root/' + '_fullchain.pem').toString('ascii');
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
+<<<<<<< HEAD
         days: 36500,
+=======
+        days: 1,
+>>>>>>> e999f970a53d3b3443cdea794b6c3c53f7947875
     };
 
     certOptions.config = [
@@ -213,9 +204,9 @@ app.get('/verify', function (req, res) {
         certOptions, function (err, cert) {
             console.log(err);
             console.log(cert);
-            fs.writeFile('./keys/verify/' + customer + '/_cert.pem', cert.certificate);
-            fs.writeFile('./keys/verify/' + customer + '/_key.pem', cert.clientKey);
-            fs.writeFile('./keys/verify/' + customer + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
+            fs.writeFile('./keys/verif/' + commonName + '/_cert.pem', cert.certificate);
+            fs.writeFile('./keys/verif/' + commonName + '/_key.pem', cert.clientKey);
+            fs.writeFile('./keys/verif/' + commonName + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
 
         });
     res.send('generated verifcation certificate')
@@ -225,11 +216,9 @@ app.get('/verify', function (req, res) {
 
 app.get('/createGroup', function (req, res) {
 
-    var query = require('url').parse(req.url,true).query;
-
-    var certiftype = query.certiftype;
-    var groupname = query.groupname;
-    var customer = query.customer;
+    var certiftype = req.query.certiftype;
+    var groupname = req.query.groupname;
+    var customername = req.query.customername;
 
     var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
 
@@ -242,7 +231,7 @@ app.get('/createGroup', function (req, res) {
             x509: {
                 signingCertificates: {
                     primary: {
-                        certificate: fs.readFileSync('./keys/'+certiftype+'/'+customer+'/' + '_cert.pem', 'utf-8').toString()
+                        certificate: fs.readFileSync('./keys/'+certiftype+'/'+customername+'/' + '_cert.pem', 'utf-8').toString()
                     }
                 }
             }
@@ -269,6 +258,7 @@ app.get('/createGroup', function (req, res) {
 });
 
 
+<<<<<<< HEAD
 
 app.get('/createDevice', function (req, res) {
 
@@ -311,6 +301,9 @@ app.get('/createDevice', function (req, res) {
 });
 
 
+=======
+//deviceid
+>>>>>>> e999f970a53d3b3443cdea794b6c3c53f7947875
 app.get('/joinGroup', function (req, res) {
     var Transport = require('azure-iot-provisioning-device-http').Http;
 
@@ -324,19 +317,11 @@ app.get('/joinGroup', function (req, res) {
     var ProvisioningDeviceClient = require('azure-iot-provisioning-device').ProvisioningDeviceClient;
 
     var provisioningHost = 'global.azure-devices-provisioning.net';
-
-    var query = require('url').parse(req.url,true).query;
-
-    var idScope = query.idscope;
-    var customer = query.customer;
-    var registrationId = query.deviceId;
-
-    // var idScope = process.env.ID_SCOPE;
-    // var registrationId = req.query.deviceId;
-    
+    var idScope = process.env.ID_SCOPE;
+    var registrationId = req.query.deviceid;
     var deviceCert = {
-        cert: fs.readFileSync('./keys/leaf/' + customer + '/' + registrationId + '/_fullchain.pem').toString(),
-        key: fs.readFileSync('./keys/leaf/' + customer + '/' + registrationId  + '/_key.pem').toString()
+        cert: fs.readFileSync('./keys/leaf/'+registrationId+'/_fullchain.pem').toString(),
+        key: fs.readFileSync('./keys/leaf/'+registrationId  +'/_key.pem').toString()
     };
 
     var transport = new Transport();
@@ -349,12 +334,33 @@ app.get('/joinGroup', function (req, res) {
             console.log("error registering device: " + err);
         } else {
             console.log('registration succeeded');
-            console.log('assigned hub=' + result.assignedHub );
+            console.log('assigned hub=' + result.assignedHub);
             console.log('deviceId=' + result.deviceId);
         }
     });
-    res.send('device registered in IoT Hub');
 });
+
+app.get('/clean',function(req,res){
+    var path = "./keys";
+   deleteFolderRecursive(path);
+    fs.mkdirSync(path);
+    res.send('cleaned');
+});
+
+function deleteFolderRecursive(path){
+    if (fs.existsSync(path)) {
+        fs.readdirSync(path).forEach(function(file, index){
+          var curPath = path + "/" + file;
+          if (fs.lstatSync(curPath).isDirectory()) { // recurse
+            deleteFolderRecursive(curPath);
+          } else { // delete file
+            fs.unlinkSync(curPath);
+          }
+        });
+        fs.rmdirSync(path);
+      }
+
+}
 
 
 http.createServer(app).listen(8000)

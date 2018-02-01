@@ -10,5 +10,13 @@ http://localhost:8000/createIntermediary?customer=smarthometechnology
 Create leaf cert:
 http://localhost:8000/createleaf?customer=smarthometechnology&deviceId=beerstation001
 
+Register DPS group
+http://localhost:8080/createGroup?certiftype=xxx&groupname=xxx&customer=xxx
+
+Register DPS individual device
+http://localhost:8000/createDevice?customer=smarthometechnology&deviceId=beerstation001
+
 Register device in IoT hub using DPS group registration:
 http://localhost:8000/joinGroup?idscope=0ne0000B2D4&customer=smarthometechnology&deviceId=beerstation001
+
+
