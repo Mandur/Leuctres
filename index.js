@@ -15,11 +15,14 @@ var app = express();
 //rootname
 app.get('/createRoot', function (req, res) {
     var commonName = req.query.rootname;
+
+  
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
-        days: 1,
+        days: 365000,
     };
+
 
     certOptions.config = [
         '[req]',
@@ -49,7 +52,7 @@ app.get('/createIntermediary', function (req, res) {
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
-        days: 1,
+        days: 365000,
     };
 
     var query = require('url').parse(req.url, true).query;
@@ -120,7 +123,7 @@ app.get('/createleaf', function (req, res) {
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
-        days: 1,
+        days: 365000,
     };
 
     certOptions.config = [
@@ -157,9 +160,6 @@ app.get('/verify', function (req, res) {
     var customer = query.customer;
     var challenge = query.challenge;
 
-    if (!fs.existsSync('./keys/verif/' + customer)) {
-        fs.mkdirSync('./keys/verif/' + customer);
-    }
 
     var commonName = challenge;
     parentCert = fs.readFileSync('./keys/root/' + '_cert.pem').toString('ascii');
@@ -171,6 +171,10 @@ app.get('/verify', function (req, res) {
         days: 1,
     };
 
+
+    if (!fs.existsSync('./keys/verif/' + commonName)) {
+        fs.mkdirSync('./keys/verif/' + commonName);
+    }
     certOptions.config = [
         '[req]',
         'req_extensions = v3_req',
@@ -198,6 +202,7 @@ app.get('/verify', function (req, res) {
     // Invoke the next step here however you like
 });
 
+//certiftype, groupname,customername
 app.get('/createGroup', function (req, res) {
 
     var certiftype = req.query.certiftype;
@@ -283,6 +288,10 @@ app.get('/clean',function(req,res){
     var path = "./keys";
    deleteFolderRecursive(path);
     fs.mkdirSync(path);
+    fs.mkdirSync(path+'/root/');
+    fs.mkdirSync(path+'/intermediary/');
+    fs.mkdirSync(path+'/leaf/');
+    fs.mkdirSync(path+'/verif/');
     res.send('cleaned');
 });
 
@@ -300,6 +309,46 @@ function deleteFolderRecursive(path){
       }
 
 }
+//customer, deviceid
+app.get('/createIndividual', function (req, res) {
+    var commonName='testads';
+    var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
+ 
+    var registrationId = req.query.deviceid;
+
+ 
+    // var connectionString = query.connectionString;
+    var connectionString = 'HostName=mytestiotmikou.azure-devices-provisioning.net;SharedAccessKeyName=provisioningserviceowner;SharedAccessKey=8lJhT0MGcjlAMbMKI1R+OYngqn9kLoIS0BnYXF0zIl8='
+    
+    var serviceClient = provisioningServiceClient.fromConnectionString(connectionString);
+    
+    var deviceCert = fs.readFileSync('./keys/leaf/' + registrationId + '/_cert.pem').toString();
+    
+    var enrollment = {
+      registrationId: registrationId,
+      deviceID: registrationId,
+      attestation: {
+        type: 'x509',
+        x509: {
+          clientCertificates: {
+            primary: {
+              certificate: deviceCert
+            }
+          }
+        }
+      }
+    };
+    
+    serviceClient.createOrUpdateIndividualEnrollment(enrollment, function (err, enrollmentResponse) {
+      if (err) {
+        console.log('error creating the individual enrollment: ' + err);
+      } else {
+        console.log(enrollmentResponse.assignedHub);
+        console.log("enrollment record returned: " + JSON.stringify(enrollmentResponse, null, 2));
+      }
+    });
+    res.send('generated device enrolment for: ' + registrationId);
+});
 
 
 http.createServer(app).listen(8000)
