@@ -60,10 +60,4 @@ typings/
 # next.js build output
 .next
 
-keys/intermediary
 
-keys/leaf
-
-keys/root
-
-keys/verif

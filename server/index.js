@@ -1,29 +1,23 @@
-
-
 var http = require('http')
 var pem = require('pem')
 var express = require('express')
 var fs = require('fs');
 require('dotenv').config();
-
+//must point to your openSSL install
 pem.config({
     pathOpenSSL: '/usr/bin/openssl'
 })
 
 var app = express();
-
-//rootname
-app.get('/createRoot', function (req, res) {
+//Create root certificate
+//arg rootname = the name of your root Certificate
+app.get('/createroot', function (req, res) {
     var commonName = req.query.rootname;
-
-  
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
         days: 365000,
     };
-
-
     certOptions.config = [
         '[req]',
         'req_extensions = v3_req',
@@ -35,7 +29,6 @@ app.get('/createRoot', function (req, res) {
         'basicConstraints = critical, CA:true'
     ].join('\n');
     certOptions.selfSigned = true;
-
     var csr = pem.createCertificate(
         certOptions, function (err, cert) {
             fs.writeFile("./keys/root/_cert.pem", cert.certificate);
@@ -44,20 +37,18 @@ app.get('/createRoot', function (req, res) {
 
         });
     console.log(csr);
-    res.send('generated root certificate')
+    res.send('generated root certificate on server side')
 });
 
-//customer
-app.get('/createIntermediary', function (req, res) {
+//Create Intermediary set of certificate based on the current root saved
+//arg customer set the customer to which the intermediate certificate apply
+app.get('/createintermediary', function (req, res) {
     var certOptions = {
         commonName: commonName,
         serial: Math.floor(Math.random() * 1000000000),
         days: 365000,
     };
-
-    var query = require('url').parse(req.url, true).query;
-    var customer = query.customer;
-
+    var query = req.query.customer;
     console.log("Generate Intermediary Cert for Customer: " + customer);
 
     var commonName = customer;
@@ -76,18 +67,14 @@ app.get('/createIntermediary', function (req, res) {
         'distinguished_name = req_distinguished_name',
         'x509_extensions = v3_ca',
         '[req_distinguished_name]',
-        'commonName = ' + commonName,
+        'commonName = ' + customer,
         '[v3_req]',
         'basicConstraints = critical, CA:true'
     ].join('\n');
-
     certOptions.serviceKey = parentKey;
     certOptions.serviceCertificate = parentCert;
-
     var csr = pem.createCertificate(
         certOptions, function (err, cert) {
-            console.log(err);
-            console.log(cert);
             fs.writeFile('./keys/intermediary/' + customer + '/_cert.pem', cert.certificate);
             fs.writeFile('./keys/intermediary/' + customer + '/_key.pem', cert.clientKey);
             fs.writeFile('./keys/intermediary/' + customer + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
@@ -98,16 +85,17 @@ app.get('/createIntermediary', function (req, res) {
     // Invoke the next step here however you like
 
 
-    res.send('generated intermediary certificate')
+    res.send('generated intermediary certificate for customer ' + customer)
 });
 
-
-//customer, deviceid
+//create a leaf certificate based on an intermediate certificate.
+//arg customer intermediary certificate to use
+//arg deviceid the device Id to which this certificate will be applied
+//return json with pair certificate + key as leaf certificate to be put on device.
 app.get('/createleaf', function (req, res) {
 
-    var query = require('url').parse(req.url, true).query;
-    var customer = query.customer;
-    var deviceId = query.deviceid;
+    var customer = req.query.customer;
+    var deviceId = req.query.deviceid;
 
     console.log("Generate Leaf Cert for Customer: " + customer + " Device: " + deviceId);
 
@@ -147,15 +135,20 @@ app.get('/createleaf', function (req, res) {
             fs.writeFile('./keys/leaf/' + deviceId + '/_key.pem', cert.clientKey);
             fs.writeFile('./keys/leaf/' + deviceId + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
 
-        });
-    res.send('generated leaf certificate')
+        }); S
 
-    // Invoke the next step here however you like
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify({ public: cert.certificate, key: cert.clientKey }));
+    console.log('generated leaf certificate');
 });
 
+//method to verify a certificate given a challenge
+//parameter challenge the challenge given by Azure
+//customer the customer of the key to verify
+//return the public part of the generated certificate
 app.get('/verify', function (req, res) {
 
-    var query = require('url').parse(req.url,true).query;
+    var query = require('url').parse(req.url, true).query;
 
     var customer = query.customer;
     var challenge = query.challenge;
@@ -197,13 +190,18 @@ app.get('/verify', function (req, res) {
             fs.writeFile('./keys/verif/' + commonName + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
 
         });
-    res.send('generated verifcation certificate')
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify({ challengeresult: cert.certificate }));
+    console.log('generated verification certificate')
 
     // Invoke the next step here however you like
 });
 
-//certiftype, groupname,customername
-app.get('/createGroup', function (req, res) {
+//Create a group based on a certificate for group provisioning
+//argument certiftype: type of the certificate, accepted value, root or intermediary
+//argument groupname: name of the group
+//argument customername: Name of the customer.
+app.get('/creategroup', function (req, res) {
 
     var certiftype = req.query.certiftype;
     var groupname = req.query.groupname;
@@ -220,7 +218,7 @@ app.get('/createGroup', function (req, res) {
             x509: {
                 signingCertificates: {
                     primary: {
-                        certificate: fs.readFileSync('./keys/'+certiftype+'/'+customername+'/' + '_cert.pem', 'utf-8').toString()
+                        certificate: fs.readFileSync('./keys/' + certiftype + '/' + customername + '/' + '_cert.pem', 'utf-8').toString()
                     }
                 }
             }
@@ -247,49 +245,10 @@ app.get('/createGroup', function (req, res) {
 });
 
 
-
-app.get('/createDevice', function (req, res) {
-
-    var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
- 
-    var query = require('url').parse(req.url,true).query;
-
-    var customer = query.customer;
-    var registrationId = query.deviceId;
-    // var connectionString = query.connectionString;
-    var connectionString = 'HostName=SaschacIoTTestProvisioning.azure-devices-provisioning.net;SharedAccessKeyName=provisioningserviceowner;SharedAccessKey=SDOxMMGc/KHKEIuiilr3A0o5YFexJto6JMd1OZE5zbs='
-    
-    var serviceClient = provisioningServiceClient.fromConnectionString(connectionString);
-    
-    var deviceCert = fs.readFileSync('./keys/leaf/' + customer + '/' + registrationId + '/_cert.pem').toString();
-    
-    var enrollment = {
-      registrationId: registrationId,
-      deviceID: registrationId,
-      attestation: {
-        type: 'x509',
-        x509: {
-          clientCertificates: {
-            primary: {
-              certificate: deviceCert
-            }
-          }
-        }
-      }
-    };
-    
-    serviceClient.createOrUpdateIndividualEnrollment(enrollment, function (err, enrollmentResponse) {
-      if (err) {
-        console.log('error creating the individual enrollment: ' + err);
-      } else {
-        console.log("enrollment record returned: " + JSON.stringify(enrollmentResponse, null, 2));
-      }
-    });
-    res.send('generated device enrolment for: ' + registrationId);
-});
-
-
-app.get('/joinGroup', function (req, res) {
+//make device join a group on Azure DPS
+//configfile ID_SCOPE: the id scope of the DPS
+//argument deviceid: the id (name) of your device
+app.get('/joingroup', function (req, res) {
     var Transport = require('azure-iot-provisioning-device-http').Http;
 
     // Feel free to change the preceding using statement to anyone of the following if you would like to try another protocol.
@@ -305,8 +264,8 @@ app.get('/joinGroup', function (req, res) {
     var idScope = process.env.ID_SCOPE;
     var registrationId = req.query.deviceid;
     var deviceCert = {
-        cert: fs.readFileSync('./keys/leaf/'+registrationId+'/_fullchain.pem').toString(),
-        key: fs.readFileSync('./keys/leaf/'+registrationId  +'/_key.pem').toString()
+        cert: fs.readFileSync('./keys/leaf/' + registrationId + '/_fullchain.pem').toString(),
+        key: fs.readFileSync('./keys/leaf/' + registrationId + '/_key.pem').toString()
     };
 
     var transport = new Transport();
@@ -325,68 +284,67 @@ app.get('/joinGroup', function (req, res) {
     });
 });
 
-app.get('/clean',function(req,res){
+//clean all stored certificates
+app.get('/clean', function (req, res) {
     var path = "./keys";
-   deleteFolderRecursive(path);
+    deleteFolderRecursive(path);
     fs.mkdirSync(path);
-    fs.mkdirSync(path+'/root/');
-    fs.mkdirSync(path+'/intermediary/');
-    fs.mkdirSync(path+'/leaf/');
-    fs.mkdirSync(path+'/verif/');
+    fs.mkdirSync(path + '/root/');
+    fs.mkdirSync(path + '/intermediary/');
+    fs.mkdirSync(path + '/leaf/');
+    fs.mkdirSync(path + '/verif/');
     res.send('cleaned');
 });
 
-function deleteFolderRecursive(path){
+function deleteFolderRecursive(path) {
     if (fs.existsSync(path)) {
-        fs.readdirSync(path).forEach(function(file, index){
-          var curPath = path + "/" + file;
-          if (fs.lstatSync(curPath).isDirectory()) { // recurse
-            deleteFolderRecursive(curPath);
-          } else { // delete file
-            fs.unlinkSync(curPath);
-          }
+        fs.readdirSync(path).forEach(function (file, index) {
+            var curPath = path + "/" + file;
+            if (fs.lstatSync(curPath).isDirectory()) { // recurse
+                deleteFolderRecursive(curPath);
+            } else { // delete file
+                fs.unlinkSync(curPath);
+            }
         });
         fs.rmdirSync(path);
-      }
+    }
 
 }
-//customer, deviceid
-app.get('/createIndividual', function (req, res) {
-    var commonName='testads';
+//create a device. 
+//argument customer: the customer name linked to the device
+//argument deviceid: the id/name of the device
+//argument type: value 'single' = single device, value 'group' = group device.
+app.get('/createdevice', function (req, res) {
     var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
- 
     var registrationId = req.query.deviceid;
+    var serviceClient = provisioningServiceClient.fromConnectionString(process.env.CONNECTION_STRING);
+    if (re.query.type == 'single')
+        var deviceCert = fs.readFileSync('./keys/leaf/' + registrationId + '/_cert.pem').toString();
+    else
+        var deviceCert = fs.readFileSync('./keys/leaf/' + registrationId + '/_fullchain.pem').toString();
 
- 
-    // var connectionString = query.connectionString;
-    var connectionString = 'HostName=mytestiotmikou.azure-devices-provisioning.net;SharedAccessKeyName=provisioningserviceowner;SharedAccessKey=8lJhT0MGcjlAMbMKI1R+OYngqn9kLoIS0BnYXF0zIl8='
-    
-    var serviceClient = provisioningServiceClient.fromConnectionString(connectionString);
-    
-    var deviceCert = fs.readFileSync('./keys/leaf/' + registrationId + '/_cert.pem').toString();
-    
     var enrollment = {
-      registrationId: registrationId,
-      deviceID: registrationId,
-      attestation: {
-        type: 'x509',
-        x509: {
-          clientCertificates: {
-            primary: {
-              certificate: deviceCert
+        registrationId: registrationId,
+        deviceID: registrationId,
+        attestation: {
+            type: 'x509',
+            x509: {
+                clientCertificates: {
+                    primary: {
+                        certificate: deviceCert
+                    }
+                }
             }
-          }
         }
-      }
     };
-    
+
     serviceClient.createOrUpdateIndividualEnrollment(enrollment, function (err, enrollmentResponse) {
-      if (err) {
-        console.log('error creating the individual enrollment: ' + err);
-      } else {
-        console.log(enrollmentResponse.assignedHub);
-        console.log("enrollment record returned: " + JSON.stringify(enrollmentResponse, null, 2));
-      }
+        if (err) {
+            console.log('error creating the individual enrollment: ' + err);
+        } else {
+            console.log(enrollmentResponse.assignedHub);
+            console.log("enrollment record returned: " + JSON.stringify(enrollmentResponse, null, 2));
+        }
     });
     res.send('generated device enrolment for: ' + registrationId);
 });
