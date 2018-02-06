@@ -415,9 +415,9 @@ app.get('/createfulldevice', function (req, res) {
         fs.mkdirSync('./keys/leaf/' + deviceId+'/');
     }
 
-    parentCert = fs.readFileSync('./keys/root/'  + '/_cert.pem').toString('ascii');
-    parentKey = fs.readFileSync('./keys/root/' + '/_key.pem').toString('ascii');
-    parentChain = fs.readFileSync('./keys/root/' + '/_fullchain.pem').toString('ascii');
+    parentCert = fs.readFileSync('./keys/root/'  + '_cert.pem').toString('ascii');
+    parentKey = fs.readFileSync('./keys/root/' + '_key.pem').toString('ascii');
+    parentChain = fs.readFileSync('./keys/root/' + '_fullchain.pem').toString('ascii');
     var certOptions = {
         commonName: deviceId,
         serial: Math.floor(Math.random() * 1000000000),
