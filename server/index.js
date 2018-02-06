@@ -144,7 +144,6 @@ app.get('/createleaf', function (req, res) {
 });
 
 //create a leaf certificate based on an intermediate certificate.
-//arg customer intermediary certificate to use
 //arg deviceid the device Id to which this certificate will be applied
 //return json with pair certificate + key as leaf certificate to be put on device.
 app.get('/createrootleaf', function (req, res) {
@@ -365,7 +364,6 @@ function deleteFolderRecursive(path) {
 
 }
 //create a device. 
-//argument customer: the customer name linked to the device
 //argument deviceid: the id/name of the device
 //argument type: value 'single' = single device, value 'group' = group device.
 app.get('/createdevice', function (req, res) {
@@ -401,6 +399,82 @@ app.get('/createdevice', function (req, res) {
         }
     });
     res.send('generated device enrolment for: ' + registrationId);
+});
+
+
+//create a leaf certificate based on an intermediate certificate.
+//arg deviceid the device Id to which this certificate will be applied
+//return json with pair certificate + key as leaf certificate to be put on device.
+app.get('/createfulldevice', function (req, res) {
+
+    var deviceId = req.query.deviceid;
+
+    console.log("Generate Leaf Cert for + Device: " + deviceId);
+
+    if (!fs.existsSync('./keys/leaf/' + deviceId+'/')) {
+        fs.mkdirSync('./keys/leaf/' + deviceId+'/');
+    }
+
+    parentCert = fs.readFileSync('./keys/root/'  + '/_cert.pem').toString('ascii');
+    parentKey = fs.readFileSync('./keys/root/' + '/_key.pem').toString('ascii');
+    parentChain = fs.readFileSync('./keys/root/' + '/_fullchain.pem').toString('ascii');
+    var certOptions = {
+        commonName: deviceId,
+        serial: Math.floor(Math.random() * 1000000000),
+        days: 365000,
+    };
+
+    certOptions.config = [
+        '[req]',
+        'req_extensions = v3_req',
+        'distinguished_name = req_distinguished_name',
+        '[req_distinguished_name]',
+        'commonName = ' + deviceId,
+        '[v3_req]',
+        'extendedKeyUsage = critical,clientAuth'
+    ].join('\n');
+
+    certOptions.serviceKey = parentKey;
+    certOptions.serviceCertificate = parentCert;
+    var returncert='error';
+    var csr = pem.createCertificate(
+        certOptions, function (err, cert) {
+
+            fs.writeFileSync('./keys/leaf/' + deviceId + '/_cert.pem', cert.certificate);
+            fs.writeFileSync('./keys/leaf/' + deviceId + '/_key.pem', cert.clientKey);
+            fs.writeFileSync('./keys/leaf/' + deviceId + '/_fullchain.pem', cert.certificate + '\n' + parentChain);  
+            returncert=cert.certificate+'||||'+cert.clientKey ;
+            console.log('generated leaf certificate');
+            console.log('start working on device registration');
+            var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
+            var serviceClient = provisioningServiceClient.fromConnectionString(process.env.CONNECTION_STRING);  
+            var enrollment = {
+                registrationId: deviceId,
+                deviceID: deviceId,
+                attestation: {
+                    type: 'x509',
+                    x509: {
+                        clientCertificates: {
+                            primary: {
+                                certificate: cert.certificate
+                            }
+                        }
+                    }
+                }
+            };
+        
+            serviceClient.createOrUpdateIndividualEnrollment(enrollment, function (err, enrollmentResponse) {
+                if (err) {
+                    console.log('error creating the individual enrollment: ' + err);
+                } else {
+                    console.log(enrollmentResponse.assignedHub);
+                    console.log("enrollment record returned: " + JSON.stringify(enrollmentResponse, null, 2));
+                }
+            });
+            res.send(returncert);
+        }); 
+
+
 });
 
 
