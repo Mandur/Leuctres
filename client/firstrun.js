@@ -26,8 +26,7 @@ deviceClient.register(function (err, result) {
     if (err) {
         console.log("error registering device: " + err);
     } else {
-        console.log('registration succeeded');
-        console.log('assigned hub=' + result.assignedHub);
-        console.log('deviceId=' + result.deviceId);
+        console.log(result.assignedHub);
+
     }
 });
