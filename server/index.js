@@ -48,7 +48,7 @@ app.get('/createintermediary', function (req, res) {
         serial: Math.floor(Math.random() * 1000000000),
         days: 365000,
     };
-    var query = req.query.customer;
+    var customer = req.query.customer;
     console.log("Generate Intermediary Cert for Customer: " + customer);
 
     var commonName = customer;
@@ -134,23 +134,76 @@ app.get('/createleaf', function (req, res) {
             fs.writeFile('./keys/leaf/' + deviceId + '/_cert.pem', cert.certificate);
             fs.writeFile('./keys/leaf/' + deviceId + '/_key.pem', cert.clientKey);
             fs.writeFile('./keys/leaf/' + deviceId + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
+            res.setHeader('Content-Type', 'application/json');
+            res.send(JSON.stringify({ public: cert.certificate, key: cert.clientKey }));    
 
-        }); S
+        }); 
 
-    res.setHeader('Content-Type', 'application/json');
-    res.send(JSON.stringify({ public: cert.certificate, key: cert.clientKey }));
+
+    console.log('generated leaf certificate');
+});
+
+//create a leaf certificate based on an intermediate certificate.
+//arg customer intermediary certificate to use
+//arg deviceid the device Id to which this certificate will be applied
+//return json with pair certificate + key as leaf certificate to be put on device.
+app.get('/createrootleaf', function (req, res) {
+
+    var deviceId = req.query.deviceid;
+
+    console.log("Generate Leaf Cert for + Device: " + deviceId);
+
+    if (!fs.existsSync('./keys/leaf/' + deviceId)) {
+        fs.mkdirSync('./keys/leaf/' + deviceId);
+    }
+
+    var commonName = deviceId;
+
+    parentCert = fs.readFileSync('./keys/root/'  + '/_cert.pem').toString('ascii');
+    parentKey = fs.readFileSync('./keys/root/' + '/_key.pem').toString('ascii');
+    parentChain = fs.readFileSync('./keys/root/' + '/_fullchain.pem').toString('ascii');
+    var certOptions = {
+        commonName: commonName,
+        serial: Math.floor(Math.random() * 1000000000),
+        days: 365000,
+    };
+
+    certOptions.config = [
+        '[req]',
+        'req_extensions = v3_req',
+        'distinguished_name = req_distinguished_name',
+        '[req_distinguished_name]',
+        'commonName = ' + commonName,
+        '[v3_req]',
+        'extendedKeyUsage = critical,clientAuth'
+    ].join('\n');
+
+    certOptions.serviceKey = parentKey;
+    certOptions.serviceCertificate = parentCert;
+
+    var csr = pem.createCertificate(
+        certOptions, function (err, cert) {
+            console.log(err);
+            console.log(cert);
+            fs.writeFile('./keys/leaf/' + deviceId + '/_cert.pem', cert.certificate);
+            fs.writeFile('./keys/leaf/' + deviceId + '/_key.pem', cert.clientKey);
+            fs.writeFile('./keys/leaf/' + deviceId + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
+            res.setHeader('Content-Type', 'application/json');
+            res.send(JSON.stringify({ public: cert.certificate, key: cert.clientKey }));    
+
+        }); 
+
+
     console.log('generated leaf certificate');
 });
 
 //method to verify a certificate given a challenge
 //parameter challenge the challenge given by Azure
-//customer the customer of the key to verify
 //return the public part of the generated certificate
 app.get('/verify', function (req, res) {
 
     var query = require('url').parse(req.url, true).query;
 
-    var customer = query.customer;
     var challenge = query.challenge;
 
 
@@ -188,11 +241,12 @@ app.get('/verify', function (req, res) {
             fs.writeFile('./keys/verif/' + commonName + '/_cert.pem', cert.certificate);
             fs.writeFile('./keys/verif/' + commonName + '/_key.pem', cert.clientKey);
             fs.writeFile('./keys/verif/' + commonName + '/_fullchain.pem', cert.certificate + '\n' + parentChain);
-
+            res.setHeader('Content-Type', 'application/json');
+            res.send(JSON.stringify({ challengeresult: cert.certificate }));
         });
-    res.setHeader('Content-Type', 'application/json');
-    res.send(JSON.stringify({ challengeresult: cert.certificate }));
+
     console.log('generated verification certificate')
+
 
     // Invoke the next step here however you like
 });
@@ -318,7 +372,7 @@ app.get('/createdevice', function (req, res) {
     var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
     var registrationId = req.query.deviceid;
     var serviceClient = provisioningServiceClient.fromConnectionString(process.env.CONNECTION_STRING);
-    if (re.query.type == 'single')
+    if (req.query.type == 'single')
         var deviceCert = fs.readFileSync('./keys/leaf/' + registrationId + '/_cert.pem').toString();
     else
         var deviceCert = fs.readFileSync('./keys/leaf/' + registrationId + '/_fullchain.pem').toString();
