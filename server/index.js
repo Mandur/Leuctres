@@ -413,18 +413,13 @@ app.get('/createdevice', function (req, res) {
     res.send('generated device enrolment for: ' + registrationId);
 });
 
-//update a device. 
+//update an individual device enrollment. 
 //argument deviceid: the id/name of the device
-//argument type: value 'single' = single device, value 'group' = group device.
 app.get('/updatedevice', function (req, res) {
 
     var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
     var registrationId = req.query.deviceid;
     var serviceClient = provisioningServiceClient.fromConnectionString(process.env.CONNECTION_STRING);
-    if (req.query.type == 'single')
-        var deviceCert = fs.readFileSync('./keys/leaf/' + registrationId + '/_cert.pem').toString();
-    else
-        var deviceCert = fs.readFileSync('./keys/leaf/' + registrationId + '/_fullchain.pem').toString();
   
     serviceClient.getIndividualEnrollment(registrationId, function (err, enrollmentResponse) {
         if (err) {
