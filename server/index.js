@@ -378,6 +378,18 @@ app.get('/createdevice', function (req, res) {
     var enrollment = {
         registrationId: registrationId,
         deviceID: registrationId,
+        provisioningStatus: 'disabled',
+        initialTwin: {
+          tags: { 
+              mytag: 'abc'
+          },
+          properties: {
+            desired: {
+              myproperty1: '123',
+              myproperty2: '789'
+            }
+          }
+        },
         attestation: {
             type: 'x509',
             x509: {
@@ -401,6 +413,92 @@ app.get('/createdevice', function (req, res) {
     res.send('generated device enrolment for: ' + registrationId);
 });
 
+//update a device. 
+//argument deviceid: the id/name of the device
+//argument type: value 'single' = single device, value 'group' = group device.
+app.get('/updatedevice', function (req, res) {
+
+    var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
+    var registrationId = req.query.deviceid;
+    var serviceClient = provisioningServiceClient.fromConnectionString(process.env.CONNECTION_STRING);
+    if (req.query.type == 'single')
+        var deviceCert = fs.readFileSync('./keys/leaf/' + registrationId + '/_cert.pem').toString();
+    else
+        var deviceCert = fs.readFileSync('./keys/leaf/' + registrationId + '/_fullchain.pem').toString();
+  
+    serviceClient.getIndividualEnrollment(registrationId, function (err, enrollmentResponse) {
+        if (err) {
+          console.log('error reading the individual enrollment: ' + err);
+        } else {
+          console.log("Etag: " + enrollmentResponse.etag);
+          
+          etag = enrollmentResponse.etag;
+
+          enrollmentResponse.provisioningStatus = 'enabled';
+          
+          serviceClient.createOrUpdateIndividualEnrollment(enrollmentResponse, function (err, enrollmentResponse2) {
+            if (err) {
+              console.log('error updating the individual enrollment: ' + err);
+            } else {
+              console.log("updated enrollment record returned: " + JSON.stringify(enrollmentResponse2, null, 2));
+            }
+          });
+
+        }
+    });
+
+    res.send('updated device enrolment for: ' + registrationId);
+});
+
+
+//query devices.
+app.get('/querydevices', function (req, res) {
+
+    var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
+    var serviceClient = provisioningServiceClient.fromConnectionString(process.env.CONNECTION_STRING);
+    var queryForEnrollments = serviceClient.createIndividualEnrollmentQuery ({
+
+        "query":"SELECT TOP 1 * from enrollments", // THIS IS CURRENTLY IGNORED BY DPS. ALL DEVICES ARE RETURNED!
+
+    });
+    
+    var onEnrollmentResults = function (err, results) {
+        if (err) {
+            console.error('Failed to fetch the results: ' + err.message);
+        } else {
+            // Do something with the results
+            results.forEach(function (enrollment) {
+            //console.log(JSON.stringify(enrollment, null, 2));
+            console.log(enrollment.registrationId);
+            });
+        
+            if (queryForEnrollments.hasMoreResults) {
+                queryForEnrollments.next(onEnrollmentResults);
+            }
+        }
+    };
+
+    console.log('Querying for the enrollments: ');
+    queryForEnrollments.next(onEnrollmentResults);
+
+    res.send('query executed.');
+});
+
+//delete individual device registration state.
+//argument deviceid: the id/name of the device
+app.get('/deletedeviceregstate', function (req, res) {
+    var provisioningServiceClient = require('azure-iot-provisioning-service').ProvisioningServiceClient;
+    var registrationId = req.query.deviceId;
+    var serviceClient = provisioningServiceClient.fromConnectionString(process.env.CONNECTION_STRING);
+    
+    serviceClient.deleteDeviceRegistrationState(registrationId, function (deletionResponse) {
+
+      console.log("deletion record returned: " + JSON.stringify(deletionResponse, null, 2));
+
+    });
+
+    res.send('deleted device registration state for: ' + registrationId);
+});
 
 //create a leaf certificate based on an intermediate certificate.
 //arg deviceid the device Id to which this certificate will be applied
@@ -472,10 +570,8 @@ app.get('/createfulldevice', function (req, res) {
                 }
             });
             res.send(returncert);
-        }); 
-
-
+        }
+    ); 
 });
-
 
 http.createServer(app).listen(8000)
